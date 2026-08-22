@@ -97,7 +97,7 @@ MsgRunning:
    bne -
    
 smcSkipPrintRunning:
-   lda #0    ;set to non-zero to skip printing MsgRunning
+   lda #1    ;set to non-zero to skip printing MsgRunning  PRH
    bne +
    lda #< MsgRunning - PRGLoadStart + PRGLoadStartReloc ; corrected for reloc
    ldy #> MsgRunning - PRGLoadStart + PRGLoadStartReloc

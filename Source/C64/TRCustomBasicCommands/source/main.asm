@@ -66,10 +66,10 @@
    rts  //return to BASIC (next line is "NEW")
 
 StartupText:
-.byte 145  //cursor up to overwrite "RUNNING... from TR"
+//cursor down and over 7 -- text spaces would be reversed // PRH
+.byte 18, 29, 29, 29, 29, 29, 29, 29   
 .text "TR CUSTOM COMMANDS LOADED"
 .byte 0 
-
 
 StartOfCode:
 .pseudopc MainMemLoc {  //compile for $c000
