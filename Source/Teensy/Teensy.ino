@@ -421,7 +421,6 @@ FLASHMEM void SetEEPDefaults()
 {
    CmdChannel->println("--> Setting EEPROM to defaults");
    EEPROM.write(eepAdPwrUpDefaults, 0x90); //default: music on, eth time synch off, hide extensions, 12 hour clock, med js speed (9/15), see RegPowerUpDefaultMasks
-   EEPROM.write(eepAdPwrUpDefaults2, 0x00); //default: TCP Listen Off, Auto-Launch Off, NFC & Serial TRCont off, see see bit mask defs RegPowerUpDefaultMasks2
    EEPROM.write(eepAdPwrUpDefaults3, 0x00); //default: Reset Detect enabled, see see bit mask defs RegPowerUpDefaultMasks3
    EEPROM.write(eepAdTimezone, 0); //default to GMT (Greenwich Mean Time)
    EEPROM.write(eepAdNextIOHndlr, IOH_None); //default to no Special HW
@@ -442,10 +441,12 @@ FLASHMEM void SetEEPDefaults()
    //hot key defaults:
    EEPwriteStr(eepAdHotKeyPaths+0*MaxPathLength, "TR:/MIDI + ASID/Cynthcart 2.0.1       +Datel MIDI"); 
 #ifdef Fab04_REU
+   EEPROM.write(eepAdPwrUpDefaults2, rpud2AltBtnAutoLaunch); //default: TCP Listen Off, Auto-Launch Off, NFC & Serial TRCont off, Alt button: Autolaunch, see see bit mask defs RegPowerUpDefaultMasks2
    EEPwriteStr(eepAdHotKeyPaths+1*MaxPathLength, "TR:/Test+Diags/REU-Checker v1.0            +REU"); 
    EEPROM.write(eepAdKERNALBinName, 0); //No default Kernal Selection
    EEPwriteStr(eepAdREUFilename, "SD:/reu.reu"); //Default REU File Name needed for saving
 #else
+   EEPROM.write(eepAdPwrUpDefaults2, rpud2AltBtnNone); //default: TCP Listen Off, Auto-Launch Off, NFC & Serial TRCont off, Alt Button: None, see see bit mask defs RegPowerUpDefaultMasks2
    EEPwriteStr(eepAdHotKeyPaths+1*MaxPathLength, "TR:/MIDI + ASID/Station64 2.6      +Passport MIDI"); 
    EEPwriteStr(eepAdKERNALBinName, "TR+ Only"); 
    EEPwriteStr(eepAdREUFilename, "TR+ Only"); 
