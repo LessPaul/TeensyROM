@@ -24,6 +24,7 @@ Detail for every item below is in its own full section further down — search t
 **Design/process gaps:**
 - No consistent allocation-failure (OOM) policy across handlers — leaning REBOOT
 - Full-firmware/MinimalBoot code duplication (`SendMsgPrintfln`, `EEPwrite*`/`EEPread*`, `LoadFile`/`ParseCRTHeader`/`ParseChipHeader`, `ServiceTCP`) — no shared translation units, already causing drift; noted as a standing reminder, not queued
+- `LoadCRT()` root-level-file path bug duplicated in `MinimalBoot.ino` and `mpe/host/MinimalBoot.ino` (`mpe-vm-review` branch) — same class as the now-fixed `RemoteLaunch()` bug, but no live consequence found; low priority
 
 **Fixed since last summary (2026-08-14, not open work — kept for context):**
 - `IOHandler[]` array / `enumIOHandlers` sync — `static_assert` added catching count mismatches
@@ -84,6 +85,20 @@ A second, smaller instance of the same gap: the "random launch" handling (line 3
 Both point at the same underlying gap — nothing enforces `DriveDirPath`'s 256-byte limit at any write site — so a fix should address the buffer discipline generally rather than patching each call site individually.
 
 **Status:** deferred — confirmed via two independent paths, high priority, not yet fixed (2026-08-12).
+
+## Low priority: `LoadCRT()`'s root-level-file path split is duplicated (unfixed) in two more places
+
+**Where:**
+1. `Source/Teensy/MinimalBoot/MinimalBoot.ino`'s `LoadCRT()` (on `main`)
+2. `mpe/host/MinimalBoot.ino`'s `LoadCRT()` (on the `mpe-vm-review` branch only, not yet merged — a verbatim copy of #1)
+
+Same bug class as `RemoteControl.ino`'s `RemoteLaunch()`, which was fixed in commit `0997c5a066f87f8f6528ed3887684a80c5af17a9` (on `mpe-vm-review`, not yet merged to `main`): for a root-level file path (e.g. `/Foo.crt` — only one `/` in the string, at index 0), `strrchr` finds that leading slash, and the path/filename-split code does `*ptrFilename = 0;` right there — leaving `DriveDirPath` as an empty string instead of `"/"`. That breaks `PathIsRoot()` (`strlen(DriveDirPath)==1 && DriveDirPath[0]=='/'`) for anything reading it afterward. Both of these two are byte-for-byte identical to the pre-fix `RemoteLaunch()` code.
+
+**Why low priority, unlike the original:** traced the actual reachable code and couldn't find a live consequence for either call path (confirmed by manual test on #1, 2026-09-08 — CRT loaded and played normally). After `LoadCRT()`, the only two things that read `DriveDirPath`/`PathIsRoot()` in MinimalBoot are `LoadFile()`'s `sprintf` (produces the identical correct path string either way, since `"" + "/" + Name` and `"/" + Name` are the same string — coincidence of the format already supplying the `/`) and `UpDirectory()`'s root guard (`StatusFunctions.c:309`, only reachable via the `IOH_TeensyROM` menu handler — which `LoadCRT()`'s single-CRT auto-launch never activates, since MinimalBoot has no interactive directory-browsing UI at all). The original `RemoteLaunch()` bug's real, reproduced consequence — a hot-keyed root-level VM `.crt` silently loading as an ordinary cartridge — came from a `DriveDirPath[0]` VM-registry guard added to the *full-firmware* `DriveDirLoad.ino`'s `HandleExecution()` on `mpe-vm-review`; `Min_DriveDirLoad.ino`'s `HandleExecution()` (what both of these two actually call) has no equivalent guard.
+
+**Fix (when done):** same pattern as the already-applied fix — after the split, if `DriveDirPath[0]` comes up empty, restore it to `"/"` and re-point the filename pointer into the untouched source buffer (`FileNamePath + 1`) rather than the now-truncated `DriveDirPath`.
+
+**Status:** deferred — low priority, no live consequence found, not yet fixed (2026-09-08).
 
 ## HIGH PRIORITY: `Min_SerUSBIO.ino`'s `LaunchFile()` can overflow the `eepAdCrtBootName` EEPROM field into adjacent EEPROM fields
 
