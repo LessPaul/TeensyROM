@@ -52,7 +52,9 @@
   // #define DbgIOTraceLog //Logs Reads/Writes to/from IO1 to BigBuf. Like debug handler but can use for others
   // #define DbgCycAdjLog  //Logs ISR timing adjustments to BigBuf.
   // #define DbgSpecial    //Special case logging to BigBuf
- 
+  #define DbgDMAEdgeTiming //Logs /DMA assert/release timing vs Phi2, printed per pass of the TR_BASIC DMA test
+  #define DbgDMAHoldDriven //TR_BASIC DMA test holds the bus with fixed-address DMA reads instead of leaving it floating
+
 //Debug HW signal enables: Recommend using only 1 at a time.
   // DbgMsgs_SW (above) includes LED/DBG signal control
   // #define DbgSignalASIDIRQ  //state toggles on each IRQ triggered to C64 (timed or untimed)

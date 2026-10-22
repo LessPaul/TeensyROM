@@ -171,6 +171,28 @@ enum DMA_States  //used with DMA_State
 uint32_t DMACycleCount;
 volatile uint8_t DMA_State = DMA_S_DisableReady;
 
+#ifdef DbgDMAEdgeTiming
+//Filled by isrPHI2 at the DMA_S_StartImmediate assert and the DMA_S_StartDisable release,
+//   printed by the TR_BASIC DMA test.  All times are from the ISR's Phi2 rising stamp.
+struct DMAEdgeLog
+{
+   uint32_t RiseToFallCyc;     //to the re-align exit, where Phi2 was seen low
+   uint32_t RiseToEdgeCyc;     //to the /DMA pin change
+   bool     FellBeforeRealign; //Phi2 was already low when the re-align started: the fall stamp is late
+   bool     Phi2HighAtEdge;    //Phi2 read high right after the pin change: the edge landed in Phi2 high
+};
+volatile DMAEdgeLog DMAAssertLog, DMAReleaseLog;
+volatile bool DMAEdgeLogged = false;  //set at the release, cleared once printed
+#endif
+
+#if defined(DbgDMAHoldDriven) && defined(Fab04_FullDMACapable)
+//TR_BASIC DMA test: the hold is driven from inside isrPHI2 (DMAHoldDriven in ISRs.c)
+#define DMAHoldAddr    0x0400   //any stable address will do: each held cycle becomes a clean read of it
+#define DMAHoldCycles  100000   //~100mS at ~1MHz, badline cycles included
+volatile bool DMAHoldNext = false;  //set by the trigger write: the StartImmediate it requests is held driven
+volatile uint32_t DMAHoldBASkipped; //held cycles with BA low that we didn't drive: ~3 per badline still float
+#endif
+
 bool (*fBusSnoop)(uint16_t Address, bool R_Wn) = NULL;    //Bus snoop routine, return true to skip out of phi2 isr
 
 //PRG-load IO handler swap handshake (see HandshakeSnoop in IOH_TeensyROM.c):

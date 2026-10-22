@@ -101,6 +101,23 @@
       ]
     },
     {
+      "name": "DMAPauseAuto",
+      "description": "DMA pause check that starts without a key press (BASIC/DMACheck.prg equivalent)",
+      "dir": "Source/C64/DMAPauseAuto",
+      "steps": [
+        { "assembler": "acme", "source": "source/DMAPauseAuto.asm", "output": "DMAPauseAuto.prg", "format": "cbm" },
+        { "assembler": "acme", "source": "source/DMAPauseAutoCtl.asm", "output": "DMAPauseAutoCtl.prg", "format": "cbm", "report": "CtlBuildReport", "labels": "CtlLabels" },
+        { "assembler": "acme", "source": "source/DMAPauseAutoSei.asm", "output": "DMAPauseAutoSei.prg", "format": "cbm", "report": "SeiBuildReport", "labels": "SeiLabels" },
+        { "assembler": "acme", "source": "source/DMAPauseAutoScan.asm", "output": "DMAPauseAutoScan.prg", "format": "cbm", "report": "ScanBuildReport", "labels": "ScanLabels" }
+      ],
+      "headers": [
+        { "input": "build/DMAPauseAuto.prg", "dest": "DMAPauseAuto.prg.h", "progmem": true },
+        { "input": "build/DMAPauseAutoCtl.prg", "dest": "DMAPauseAutoCtl.prg.h", "progmem": true },
+        { "input": "build/DMAPauseAutoSei.prg", "dest": "DMAPauseAutoSei.prg.h", "progmem": true },
+        { "input": "build/DMAPauseAutoScan.prg", "dest": "DMAPauseAutoScan.prg.h", "progmem": true }
+      ]
+    },
+    {
       "name": "TRCustomBasicCommands",
       "description": "Custom TeensyROM BASIC commands. Built with KickAssembler, which needs Java; the framework code is vendored from barryw/CustomBasicCommands (MIT).",
       "dir": "Source/C64/TRCustomBasicCommands",

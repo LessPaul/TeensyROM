@@ -46,6 +46,10 @@
 #include "TRMenuFiles/ROMs/destest_max.rom.h"
 #include "TRMenuFiles/ROMs/empty.prg.h"
 #include "TRMenuFiles/ROMs/DMACheck.prg.h"
+#include "TRMenuFiles/ROMs/DMAPauseAuto.prg.h"
+#include "TRMenuFiles/ROMs/DMAPauseAutoCtl.prg.h"
+#include "TRMenuFiles/ROMs/DMAPauseAutoSei.prg.h"
+#include "TRMenuFiles/ROMs/DMAPauseAutoScan.prg.h"
 #include "TRMenuFiles/ROMs/cia_tod.prg.h"
 #include "TRMenuFiles/ROMs/TODCheck.prg.h"
 #include "TRMenuFiles/ROMs/Load8Run.prg.h"
@@ -161,7 +165,11 @@ StructMenuItem dirTest_Diags[] =
    rtFilePrg  , IOH_None         , (char*)"SID checker+finder"               , (uint8_t*)SID_check_prg              , sizeof(SID_check_prg) ,
    rtFilePrg  , IOH_None         , (char*)"CIA TimeOfDay clock check(BASIC)" , (uint8_t*)cia_tod_prg                , sizeof(cia_tod_prg) ,
    rtFilePrg  , IOH_None         , (char*)"CIA TimeOfDay clock check(assy)"  , (uint8_t*)TODCheck_prg                , sizeof(cia_tod_prg) ,
-   rtFilePrg  , IOH_TR_BASIC     , (char*)"DMA Pause Check"                  , (uint8_t*)DMACheck_prg               , sizeof(DMACheck_prg) , 
+   rtFilePrg  , IOH_TR_BASIC     , (char*)"DMA Pause Check"                  , (uint8_t*)DMACheck_prg               , sizeof(DMACheck_prg) ,
+   rtFilePrg  , IOH_TR_BASIC     , (char*)"DMA Pause Check (auto start)"     , (uint8_t*)DMAPauseAuto_prg           , sizeof(DMAPauseAuto_prg) ,
+   rtFilePrg  , IOH_TR_BASIC     , (char*)"DMA Pause Check (no-DMA control)" , (uint8_t*)DMAPauseAutoCtl_prg        , sizeof(DMAPauseAutoCtl_prg) ,
+   rtFilePrg  , IOH_TR_BASIC     , (char*)"DMA Pause Check (IRQs masked)"    , (uint8_t*)DMAPauseAutoSei_prg        , sizeof(DMAPauseAutoSei_prg) ,
+   rtFilePrg  , IOH_TR_BASIC     , (char*)"DMA Pause Check (RAM scan)"       , (uint8_t*)DMAPauseAutoScan_prg       , sizeof(DMAPauseAutoScan_prg) ,
 #ifdef Fab04_REU
    rtFilePrg  , IOH_REU          , (char*)"CMD 1750-1750XL REU Test    +REU" , (uint8_t*)reutest_prg                , sizeof(reutest_prg) , 
    rtFilePrg  , IOH_REU          , (char*)"REU-Checker v1.0            +REU" , (uint8_t*)reu_checker_v1_0_prg       , sizeof(reu_checker_v1_0_prg) , 

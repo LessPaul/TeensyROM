@@ -48,12 +48,69 @@ FASTRUN void isrExtResetDetect()
 }
 #endif
 
+#ifdef DbgDMAEdgeTiming
+//Right after the /DMA pin change: RiseCyc and FellBeforeRealign are taken in isrPHI2 before the re-align
+#define LogDMAEdge(Log) do {                         \
+   uint32_t EdgeCyc = ARM_DWT_CYCCNT;                \
+   bool Phi2High = GP6_Phi2(ReadGPIO6);              \
+   Log.RiseToFallCyc = StartCycCnt - RiseCyc;        \
+   Log.RiseToEdgeCyc = EdgeCyc - RiseCyc;            \
+   Log.FellBeforeRealign = FellBeforeRealign;        \
+   Log.Phi2HighAtEdge = Phi2High;                    \
+} while(0)
+#endif
+
 void DMAWaitAssertReady()
 {
-   WaitUntil_nS(nS_DMAAssert); 
+   WaitUntil_nS(nS_DMAAssert);
    SetDMAAssert;
    DMA_State = DMA_S_TransferReady;
 }
+
+#if defined(DbgDMAHoldDriven) && defined(Fab04_FullDMACapable)
+//Called from isrPHI2 right after SetDMAAssert, in the VIC phase after the trigger write (StartCycCnt = that
+//   Phi2 fall).  Reads DMAHoldAddr in every cycle the bus is ours, starting with this one, then releases DMA
+//   at the Phi2 fall after the last: no CPU phase 2 is left floating at either end, which is what corrupted
+//   C64 DRAM rows with the bus left floating (DMAPauseAuto RAM scan).  Blocks the ISR for the whole hold, as
+//   DirectREU does.  Cycles with BA low are skipped and counted: the ~3 per badline before the VIC takes
+//   the bus still float.
+FASTRUN void DMAHoldDriven()
+{
+   uint8_t Discard;
+   DMA_RnW = DMA_READ;
+   DMA_FixC64Addr = DMA_ADDR_FIXED;
+   DMA_StartAddr = DMAHoldAddr;
+   DMA_Count = 0;
+   DMAHoldBASkipped = 0;
+
+   for (uint32_t Cycle = 0; Cycle < DMAHoldCycles; Cycle++)
+   {
+      if (DMAByte(&Discard)) LastCycCnt = StartCycCnt; //DMAByte stamps StartCycCnt just ahead of phi2 rising
+      else
+      {  //BA low, still in this VIC phase
+         DMAHoldBASkipped++;
+         while(!GP6_Phi2(ReadGPIO6)); //Find phi2 rising
+         LastCycCnt = ARM_DWT_CYCCNT;
+      }
+      while(GP6_Phi2(ReadGPIO6)); //Find phi2 falling
+      StartCycCnt = ARM_DWT_CYCCNT;
+   }
+
+   SetDMADeassert;  //at the fall after the last driven phase 2, as DMA_S_StartDisable releases
+   #ifdef DbgDMAEdgeTiming
+      const uint32_t RiseCyc = LastCycCnt;
+      const bool FellBeforeRealign = false;
+      LogDMAEdge(DMAReleaseLog);
+      DMAEdgeLogged = true;
+   #endif
+   DMA_State = DMA_S_DisableReady;
+   DMAHoldNext = false;
+   //Phi2 edges during the hold left the interrupt pending: clear it so the next isrPHI2
+   //is the CPU's first cycle, not a stale entry in this VIC phase (see DirectREU)
+   GPIO6_ISR = CORE_PIN1_BITMASK;  //PHI2_PIN, write-1-to-clear
+   NVIC_CLEAR_PENDING(IRQ_GPIO6789);
+}
+#endif
 
 //Phi2 rising edge:
 FASTRUN void isrPHI2() 
@@ -145,6 +202,10 @@ FASTRUN void isrPHI2()
    
    if (EmulateVicCycles || DMA_State > DMA_S_BeginStartStates)
    {
+      #ifdef DbgDMAEdgeTiming
+         const uint32_t RiseCyc = StartCycCnt;
+         const bool FellBeforeRealign = !GP6_Phi2(ReadGPIO6);
+      #endif
       while(GP6_Phi2(ReadGPIO6)); //Re-align to phi2 falling, if needed
       //phi2 has gone low..........................................................................
       
@@ -158,6 +219,10 @@ FASTRUN void isrPHI2()
             case DMA_S_StartDisable:
                //WaitUntil_nS(nS_DMAAssert);  //Have seen corruption with this in place
                SetDMADeassert;
+               #ifdef DbgDMAEdgeTiming
+                  LogDMAEdge(DMAReleaseLog);
+                  DMAEdgeLogged = true;
+               #endif
                DMA_State = DMA_S_DisableReady;
                return;
                
@@ -192,8 +257,18 @@ FASTRUN void isrPHI2()
                return;    
 
             case DMA_S_StartImmediate:
-               WaitUntil_nS(nS_DMAAssert); 
+               WaitUntil_nS(nS_DMAAssert);
                SetDMAAssert;
+               #ifdef DbgDMAEdgeTiming
+                  LogDMAEdge(DMAAssertLog);
+               #endif
+               #if defined(DbgDMAHoldDriven) && defined(Fab04_FullDMACapable)
+                  if (DMAHoldNext)
+                  {
+                     DMAHoldDriven(); //holds, then releases
+                     return;
+                  }
+               #endif
                DMA_State = DMA_S_ActiveReady;
                return;
          }

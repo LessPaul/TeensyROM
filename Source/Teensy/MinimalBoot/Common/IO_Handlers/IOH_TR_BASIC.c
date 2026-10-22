@@ -316,10 +316,47 @@ FLASHMEM uint8_t ContRegAction_DmaTest()
 {  // Assert DMA for 100mS and release
    //DMA started immediately in IO1 handler, just waiting and trigerring disable here.
    Printf_dbg("DMA Trig\n");
+#if defined(DbgDMAHoldDriven) && defined(Fab04_FullDMACapable)
+   //isrPHI2 already held and released it (DMAHoldDriven), in the call that took the trigger write
+   if (DMAHoldNext || DMA_State != DMA_S_DisableReady) Serial.printf("DMA hold: not run (state %d)\n", DMA_State);
+#else
    delay(100);  //100
    DMA_State = DMA_S_StartDisable;
-   return TR_BASStat_Ready;  
+#endif
+   return TR_BASStat_Ready;
 }
+
+#ifdef DbgDMAEdgeTiming
+uint32_t DMAEdgePass, DMAEdgeMaxAssertnS, DMAEdgeMaxReleasenS, DMAEdgeFlagged;
+
+FLASHMEM void PrintDMAEdgeFlags(volatile DMAEdgeLog &Log)
+{
+   if (Log.FellBeforeRealign) Serial.printf(" FELL-EARLY");
+   if (Log.Phi2HighAtEdge) Serial.printf(" PHI2-HIGH");
+}
+
+//One line per DMA test pass, from the polling handler once the release is logged: after status is ready,
+//   so it can't hold up the C64's poll.  The last line before a crash is the pass that failed.
+FLASHMEM void PrintDMAEdgeLog()
+{
+   DMAEdgeLogged = false;
+   uint32_t AssertnS = CycTonS(DMAAssertLog.RiseToEdgeCyc);
+   uint32_t ReleasenS = CycTonS(DMAReleaseLog.RiseToEdgeCyc);
+   if (AssertnS > DMAEdgeMaxAssertnS) DMAEdgeMaxAssertnS = AssertnS;
+   if (ReleasenS > DMAEdgeMaxReleasenS) DMAEdgeMaxReleasenS = ReleasenS;
+   if (DMAAssertLog.FellBeforeRealign || DMAAssertLog.Phi2HighAtEdge ||
+       DMAReleaseLog.FellBeforeRealign || DMAReleaseLog.Phi2HighAtEdge) DMAEdgeFlagged++;
+
+   Serial.printf("DMA #%lu  assert: fall %lu, edge %lu nS", ++DMAEdgePass, CycTonS(DMAAssertLog.RiseToFallCyc), AssertnS);
+   PrintDMAEdgeFlags(DMAAssertLog);
+   Serial.printf("  release: fall %lu, edge %lu nS", CycTonS(DMAReleaseLog.RiseToFallCyc), ReleasenS);
+   PrintDMAEdgeFlags(DMAReleaseLog);
+#if defined(DbgDMAHoldDriven) && defined(Fab04_FullDMACapable)
+   Serial.printf("  BA-skip %lu", DMAHoldBASkipped);
+#endif
+   Serial.printf("  (max %lu/%lu, flagged %lu)\n", DMAEdgeMaxAssertnS, DMAEdgeMaxReleasenS, DMAEdgeFlagged);
+}
+#endif
 
 FLASHMEM uint8_t ContRegAction_TISet()
 {  //Get the time from RTC, convert to jiffies for readback into TI/TI$   
@@ -353,7 +390,12 @@ FLASHMEM void InitHndlr_TR_BASIC()
  
    TR_BASStatRegVal = TR_BASStat_Ready;
    TR_BASContRegAction = TR_BASCont_None; //default to no action
-}   
+
+#ifdef DbgDMAEdgeTiming
+   DMAEdgeLogged = false; //drop anything logged before this launch, e.g. a CRT bank swap
+   DMAEdgePass = DMAEdgeMaxAssertnS = DMAEdgeMaxReleasenS = DMAEdgeFlagged = 0;
+#endif
+}
 
 void IO1Hndlr_TR_BASIC(uint8_t Address, bool R_Wn)
 {
@@ -411,6 +453,14 @@ void IO1Hndlr_TR_BASIC(uint8_t Address, bool R_Wn)
                //these commandd require action outside of interrupt: 
                case TR_BASCont_DmaTest:    // Assert DMA for 100mS
                   DMA_State = DMA_S_StartImmediate; //start DMA on VIC Phase of this cycle (IO write, will be followed by a read)
+#if defined(DbgDMAHoldDriven) && defined(Fab04_FullDMACapable)
+                  //isrPHI2 holds the bus driven and releases it later in this same call, so status is
+                  //   ready before the C64 can next read it; the thread only checks that it ran
+                  DMAHoldNext = true;
+                  TR_BASContRegAction = Data;
+                  TR_BASStatRegVal = TR_BASStat_Ready;
+                  break;
+#endif
                   // break keyword is not present, all the cases after the matching case are executed
                case TR_BASCont_LoadPrep:   //load file into RAM 
                case TR_BASCont_SaveFinish: //save file from RAM
@@ -446,6 +496,10 @@ void IO1Hndlr_TR_BASIC(uint8_t Address, bool R_Wn)
 
 void PollingHndlr_TR_BASIC()
 {
+#ifdef DbgDMAEdgeTiming
+   if (DMAEdgeLogged) PrintDMAEdgeLog();
+#endif
+
    if (TR_BASContRegAction != TR_BASCont_None)
    {
       switch(TR_BASContRegAction)
